@@ -1,0 +1,190 @@
+<!-- plugins/redmine_status_scripts/app/views/status_scripts/show.html.erb -->
+<div class="contextual">
+  <%= link_to 'Bearbeiten', edit_status_script_path(@status_script_config), class: 'icon icon-edit' %>
+  <%= link_to 'Löschen', status_script_path(@status_script_config), 
+              method: :delete, 
+              confirm: 'Script wirklich löschen?', 
+              class: 'icon icon-del' %>
+</div>
+
+<h2><%= @status_script_config.name %></h2>
+
+<div class="splitcontent">
+  <div class="splitcontentleft">
+    <div class="box">
+      <h3>Konfiguration</h3>
+      
+      <table class="attributes">
+        <tr>
+          <th>Status:</th>
+          <td>
+            <span class="<%= @status_script_config.enabled? ? 'enabled' : 'disabled' %>">
+              <%= @status_script_config.enabled? ? 'Aktiv' : 'Inaktiv' %>
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <th>Status-Übergang:</th>
+          <td>
+            <%= @status_script_config.from_status&.name || 'Jeder Status' %> → 
+            <%= @status_script_config.to_status.name %>
+          </td>
+        </tr>
+        <tr>
+          <th>Projekt:</th>
+          <td><%= @status_script_config.project&.name || 'Alle Projekte' %></td>
+        </tr>
+        <tr>
+          <th>Script-Typ:</th>
+          <td><%= @status_script_config.script_type.humanize %></td>
+        </tr>
+        <tr>
+          <th>Timeout:</th>
+          <td><%= @status_script_config.timeout %> Sekunden</td>
+        </tr>
+        <% if @status_script_config.description.present? %>
+        <tr>
+          <th>Beschreibung:</th>
+          <td><%= simple_format(@status_script_config.description) %></td>
+        </tr>
+        <% end %>
+      </table>
+    </div>
+
+    <% if @status_script_config.script_type == 'webhook' %>
+      <div class="box">
+        <h3>Webhook-Konfiguration</h3>
+        <table class="attributes">
+          <tr>
+            <th>URL:</th>
+            <td><%= link_to @status_script_config.webhook_url, @status_script_config.webhook_url, target: '_blank' %></td>
+          </tr>
+        </table>
+      </div>
+    <% elsif @status_script_config.script_content.present? %>
+      <div class="box">
+        <h3>Script-Inhalt</h3>
+        <pre style="background: #f8f9fa; padding: 10px; border: 1px solid #e9ecef; border-radius: 4px; font-family: monospace; white-space: pre-wrap;"><%= @status_script_config.script_content %></pre>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="splitcontentright">
+    <div class="box">
+      <h3>Statistiken</h3>
+      <% 
+        total_executions = @logs.count
+        successful_executions = @logs.select(&:success?).count
+        failed_executions = total_executions - successful_executions
+        success_rate = total_executions > 0 ? (successful_executions.to_f / total_executions * 100).round(1) : 0
+      %>
+      
+      <table class="attributes">
+        <tr>
+          <th>Gesamt-Ausführungen:</th>
+          <td><%= total_executions %></td>
+        </tr>
+        <tr>
+          <th>Erfolgreich:</th>
+          <td style="color: green;"><%= successful_executions %></td>
+        </tr>
+        <tr>
+          <th>Fehlgeschlagen:</th>
+          <td style="color: red;"><%= failed_executions %></td>
+        </tr>
+        <tr>
+          <th>Erfolgsquote:</th>
+          <td><%= success_rate %>%</td>
+        </tr>
+        <% if @logs.any? %>
+        <tr>
+          <th>Letzte Ausführung:</th>
+          <td><%= time_ago_in_words(@logs.first.executed_at) %> ago</td>
+        </tr>
+        <% end %>
+      </table>
+    </div>
+
+    <div class="box">
+      <h3>Verfügbare Parameter</h3>
+      <% if @status_script_config.script_type == 'shell' %>
+        <p><strong>Umgebungsvariablen:</strong></p>
+        <ul>
+          <li><code>REDMINE_ISSUE_ID</code> - Issue-ID</li>
+          <li><code>REDMINE_ISSUE_SUBJECT</code> - Issue-Titel</li>
+          <li><code>REDMINE_PROJECT_NAME</code> - Projekt-Name</li>
+          <li><code>REDMINE_OLD_STATUS_NAME</code> - Alter Status</li>
+          <li><code>REDMINE_NEW_STATUS_NAME</code> - Neuer Status</li>
+          <li><code>REDMINE_ASSIGNEE_NAME</code> - Zugewiesene Person</li>
+          <li><code>REDMINE_AUTHOR_NAME</code> - Ersteller</li>
+        </ul>
+      <% elsif @status_script_config.script_type == 'ruby' %>
+        <p><strong>Instanzvariablen:</strong></p>
+        <ul>
+          <li><code>@issue_id</code> - Issue-ID</li>
+          <li><code>@issue_subject</code> - Issue-Titel</li>
+          <li><code>@project_name</code> - Projekt-Name</li>
+          <li><code>@old_status_name</code> - Alter Status</li>
+          <li><code>@new_status_name</code> - Neuer Status</li>
+          <li><code>@assignee_name</code> - Zugewiesene Person</li>
+          <li><code>@author_name</code> - Ersteller</li>
+        </ul>
+      <% elsif @status_script_config.script_type == 'webhook' %>
+        <p><strong>JSON-Parameter:</strong></p>
+        <ul>
+          <li><code>issue_id</code> - Issue-ID</li>
+          <li><code>issue_subject</code> - Issue-Titel</li>
+          <li><code>project_name</code> - Projekt-Name</li>
+          <li><code>old_status_name</code> - Alter Status</li>
+          <li><code>new_status_name</code> - Neuer Status</li>
+          <li><code>assignee_name</code> - Zugewiesene Person</li>
+          <li><code>author_name</code> - Ersteller</li>
+        </ul>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div style="clear: both;"></div>
+
+<h3>Ausführungs-Logs (<%= @logs.count %>)</h3>
+
+<% if @logs.any? %>
+  <table class="list">
+    <thead>
+      <tr>
+        <th>Zeitpunkt</th>
+        <th>Issue</th>
+        <th>Status-Wechsel</th>
+        <th>Ergebnis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @logs.each do |log| %>
+        <tr class="<%= cycle('odd', 'even') %>">
+          <td><%= format_time(log.executed_at) %></td>
+          <td>
+            <%= link_to "##{log.issue.id}", issue_path(log.issue) %>
+            <br><%= truncate(log.issue.subject, length: 40) %>
+          </td>
+          <td>
+            <%= log.from_status&.name || 'Unbekannt' %> → 
+            <%= log.to_status.name %>
+          </td>
+          <td>
+            <% if log.success? %>
+              <span style="color: green;">✓ Erfolgreich</span>
+            <% else %>
+              <span style="color: red;">✗ Fehlgeschlagen</span>
+              <% if log.error_message.present? %>
+                <br><small><%= truncate(log.error_message, length: 100) %></small>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="nodata">Noch keine Ausführungen für dieses Script.</p>
+<% end %>

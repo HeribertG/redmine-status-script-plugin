@@ -1,0 +1,154 @@
+<%= form_with model: @status_script_config, local: true, html: { class: 'tabular' } do |f| %>
+  <%= render 'common/error_messages', object: @status_script_config %>
+
+  <div class="box tabular">
+    <p>
+      <%= f.label :name, 'Name', class: 'required' %>
+      <%= f.text_field :name, required: true, size: 60 %>
+    </p>
+
+    <p>
+      <%= f.label :description, 'Beschreibung' %>
+      <%= f.text_area :description, rows: 3, cols: 60 %>
+    </p>
+
+    <p>
+      <%= f.label :from_status_id, 'Von Status' %>
+      <%= f.select :from_status_id, 
+                   options_from_collection_for_select(@issue_statuses, :id, :name, @status_script_config.from_status_id),
+                   { prompt: 'Jeder Status' },
+                   { class: 'status-select' } %>
+      <em class="info">Leer lassen für alle Ausgangsstatus</em>
+    </p>
+
+    <p>
+      <%= f.label :to_status_id, 'Zu Status', class: 'required' %>
+      <%= f.select :to_status_id, 
+                   options_from_collection_for_select(@issue_statuses, :id, :name, @status_script_config.to_status_id),
+                   { prompt: 'Status auswählen...' },
+                   { required: true, class: 'status-select' } %>
+    </p>
+
+    <p>
+      <%= f.label :project_id, 'Projekt' %>
+      <%= f.select :project_id, 
+                   options_from_collection_for_select(@projects, :id, :name, @status_script_config.project_id),
+                   { prompt: 'Alle Projekte' },
+                   { class: 'project-select' } %>
+      <em class="info">Leer lassen für alle Projekte</em>
+    </p>
+
+    <p>
+      <%= f.label :script_type, 'Script-Typ', class: 'required' %>
+      <%= f.select :script_type, 
+                   options_for_select([
+                     ['Shell Script', 'shell'],
+                     ['Webhook (HTTP POST)', 'webhook'],
+                     ['Ruby Code', 'ruby']
+                   ], @status_script_config.script_type),
+                   { prompt: 'Typ auswählen...' },
+                   { required: true, id: 'script_type_select' } %>
+    </p>
+
+    <div id="webhook_url_field" style="display: none;">
+      <p>
+        <%= f.label :webhook_url, 'Webhook URL', class: 'required' %>
+        <%= f.url_field :webhook_url, size: 60, placeholder: 'https://your-app.com/webhook' %>
+        <em class="info">HTTP POST mit JSON-Daten wird an diese URL gesendet</em>
+      </p>
+    </div>
+
+    <div id="script_content_field" style="display: none;">
+      <p>
+        <%= f.label :script_content, 'Script-Inhalt', class: 'required' %>
+        <%= f.text_area :script_content, rows: 15, cols: 80, 
+                        class: 'code-editor',
+                        placeholder: get_script_placeholder(@status_script_config.script_type) %>
+      </p>
+    </div>
+
+    <p>
+      <%= f.label :timeout, 'Timeout (Sekunden)' %>
+      <%= f.number_field :timeout, min: 1, max: 300, 
+                         value: @status_script_config.timeout || 30 %>
+      <em class="info">Maximale Ausführungszeit</em>
+    </p>
+
+    <p>
+      <%= f.label :environment_variables, 'Umgebungsvariablen' %>
+      <%= f.text_area :environment_variables, rows: 4, cols: 60,
+                      placeholder: "KEY1=value1\nKEY2=value2" %>
+      <em class="info">Eine pro Zeile im Format KEY=value (nur für Shell Scripts)</em>
+    </p>
+
+    <p>
+      <%= f.check_box :enabled %>
+      <%= f.label :enabled, 'Aktiviert' %>
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <%= submit_tag(@status_script_config.new_record? ? 'Erstellen' : 'Speichern', 
+                   class: 'button-positive') %>
+    <%= link_to 'Abbrechen', status_scripts_path, class: 'button' %>
+  </div>
+<% end %>
+
+<% content_for :header_tags do %>
+  <script>
+    function updateScriptFields() {
+      var scriptType = document.getElementById('script_type_select').value;
+      var webhookField = document.getElementById('webhook_url_field');
+      var contentField = document.getElementById('script_content_field');
+      var contentTextarea = document.querySelector('#status_script_config_script_content');
+      
+      if (scriptType === 'webhook') {
+        webhookField.style.display = 'block';
+        contentField.style.display = 'none';
+      } else if (scriptType === 'shell' || scriptType === 'ruby') {
+        webhookField.style.display = 'none';
+        contentField.style.display = 'block';
+        
+        // Placeholder basierend auf Script-Typ setzen
+        if (scriptType === 'shell') {
+          contentTextarea.placeholder = `#!/bin/bash
+echo "Issue $REDMINE_ISSUE_ID changed to $REDMINE_NEW_STATUS_NAME"
+echo "Project: $REDMINE_PROJECT_NAME"
+echo "Assignee: $REDMINE_ASSIGNEE_NAME"
+
+# Beispiel: Slack-Benachrichtigung
+curl -X POST -H 'Content-type: application/json' \\
+  --data "{\\"text\\":\\"Issue #$REDMINE_ISSUE_ID wurde auf '$REDMINE_NEW_STATUS_NAME' gesetzt\\"}" \\
+  https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK`;
+        } else if (scriptType === 'ruby') {
+          contentTextarea.placeholder = `# Zugriff auf Parameter über @variablen
+puts "Issue #{@issue_id}: #{@issue_subject}"
+puts "Status: #{@old_status_name} → #{@new_status_name}"
+
+# Beispiel: E-Mail versenden
+if @new_status_name == 'Resolved'
+  # UserMailer.issue_resolved(@issue_id).deliver_now
+end`;
+        }
+      } else {
+        webhookField.style.display = 'none';
+        contentField.style.display = 'none';
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('script_type_select').addEventListener('change', updateScriptFields);
+      updateScriptFields(); // Initial call
+    });
+  </script>
+<% end %>
+
+<!-- plugins/redmine_status_scripts/app/views/status_scripts/new.html.erb -->
+<h2>Neues Status Script</h2>
+
+<%= render 'form' %>
+
+<!-- plugins/redmine_status_scripts/app/views/status_scripts/edit.html.erb -->
+<h2>Status Script bearbeiten</h2>
+
+<%= render 'form' %>

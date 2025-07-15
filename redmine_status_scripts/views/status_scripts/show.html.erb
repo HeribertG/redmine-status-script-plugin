@@ -1,0 +1,401 @@
+<%= content_for :header_tags do %>
+  <%= stylesheet_link_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+<% end %>
+
+<div class="contextual">
+  <%= link_to 'Bearbeiten', edit_status_script_path(@status_script_config), 
+              class: 'icon icon-edit' %>
+  <%= link_to 'Testen', test_status_script_path(@status_script_config), 
+              method: :post,
+              class: 'icon icon-test',
+              confirm: 'Script mit Test-Daten ausführen?' %>
+  <%= link_to (@status_script_config.enabled? ? 'Deaktivieren' : 'Aktivieren'), 
+              toggle_status_script_path(@status_script_config), 
+              method: :patch,
+              class: "icon #{@status_script_config.enabled? ? 'icon-lock' : 'icon-unlock'}" %>
+  <%= link_to 'Löschen', status_script_path(@status_script_config), 
+              method: :delete,
+              class: 'icon icon-del',
+              confirm: 'Script wirklich löschen?' %>
+</div>
+
+<h2><%= @status_script_config.name %></h2>
+
+<div class="script-details">
+  <div class="splitcontentleft">
+    <div class="box">
+      <h3>Konfiguration</h3>
+      
+      <table class="attributes">
+        <tr>
+          <th>Status:</th>
+          <td>
+            <%= content_tag :span, 
+                  @status_script_config.enabled? ? 'Aktiv' : 'Inaktiv',
+                  class: "status-badge #{@status_script_config.enabled? ? 'enabled' : 'disabled'}" %>
+          </td>
+        </tr>
+        <tr>
+          <th>Status-Übergang:</th>
+          <td>
+            <span class="from-status">
+              <%= @status_script_config.from_status&.name || 'Jeder Status' %>
+            </span>
+            <span class="arrow">→</span>
+            <span class="to-status">
+              <%= @status_script_config.to_status.name %>
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <th>Projekt:</th>
+          <td><%= @status_script_config.project&.name || 'Alle Projekte' %></td>
+        </tr>
+        <tr>
+          <th>Script-Typ:</th>
+          <td>
+            <span class="script-type-badge script-type-<%= @status_script_config.script_type %>">
+              <%= @status_script_config.script_type.humanize %>
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <th>Timeout:</th>
+          <td><%= @status_script_config.timeout %> Sekunden</td>
+        </tr>
+        <% if @status_script_config.description.present? %>
+        <tr>
+          <th>Beschreibung:</th>
+          <td><%= simple_format(@status_script_config.description) %></td>
+        </tr>
+        <% end %>
+      </table>
+    </div>
+
+    <% if @status_script_config.script_type == 'webhook' %>
+      <div class="box">
+        <h3>Webhook-Konfiguration</h3>
+        <table class="attributes">
+          <tr>
+            <th>URL:</th>
+            <td><%= link_to @status_script_config.webhook_url, @status_script_config.webhook_url, target: '_blank' %></td>
+          </tr>
+        </table>
+      </div>
+    <% elsif @status_script_config.script_content.present? %>
+      <div class="box">
+        <h3>Script-Inhalt</h3>
+        <pre class="script-content"><%= @status_script_config.script_content %></pre>
+      </div>
+    <% end %>
+
+    <% if @status_script_config.environment_variables.present? %>
+      <div class="box">
+        <h3>Umgebungsvariablen</h3>
+        <pre class="env-vars"><%= @status_script_config.environment_variables %></pre>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="splitcontentright">
+    <div class="box">
+      <h3>Statistiken</h3>
+      <% 
+        total_executions = @logs.count
+        successful_executions = @logs.successful.count
+        failed_executions = @logs.failed.count
+        success_rate = total_executions > 0 ? (successful_executions.to_f / total_executions * 100).round(1) : 0
+      %>
+      
+      <table class="attributes">
+        <tr>
+          <th>Gesamt-Ausführungen:</th>
+          <td><%= total_executions %></td>
+        </tr>
+        <tr>
+          <th>Erfolgreich:</th>
+          <td class="success"><%= successful_executions %></td>
+        </tr>
+        <tr>
+          <th>Fehlgeschlagen:</th>
+          <td class="error"><%= failed_executions %></td>
+        </tr>
+        <tr>
+          <th>Erfolgsquote:</th>
+          <td>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: <%= success_rate %>%"></div>
+              <span class="progress-text"><%= success_rate %>%</span>
+            </div>
+          </td>
+        </tr>
+        <% if @logs.any? %>
+        <tr>
+          <th>Letzte Ausführung:</th>
+          <td><%= time_ago_in_words(@logs.first.executed_at) %> ago</td>
+        </tr>
+        <% end %>
+      </table>
+    </div>
+
+    <div class="box">
+      <h3>Verfügbare Parameter</h3>
+      <div class="parameter-info">
+        <% if @status_script_config.script_type == 'shell' %>
+          <p><strong>Umgebungsvariablen:</strong></p>
+          <ul class="parameter-list">
+            <li><code>REDMINE_ISSUE_ID</code></li>
+            <li><code>REDMINE_ISSUE_SUBJECT</code></li>
+            <li><code>REDMINE_PROJECT_NAME</code></li>
+            <li><code>REDMINE_OLD_STATUS_NAME</code></li>
+            <li><code>REDMINE_NEW_STATUS_NAME</code></li>
+            <li><code>REDMINE_ASSIGNEE_NAME</code></li>
+            <li><code>REDMINE_AUTHOR_NAME</code></li>
+          </ul>
+        <% elsif @status_script_config.script_type == 'ruby' %>
+          <p><strong>Instanzvariablen:</strong></p>
+          <ul class="parameter-list">
+            <li><code>@issue_id</code></li>
+            <li><code>@issue_subject</code></li>
+            <li><code>@project_name</code></li>
+            <li><code>@old_status_name</code></li>
+            <li><code>@new_status_name</code></li>
+            <li><code>@assignee_name</code></li>
+            <li><code>@author_name</code></li>
+          </ul>
+        <% elsif @status_script_config.script_type == 'webhook' %>
+          <p><strong>JSON-Parameter:</strong></p>
+          <ul class="parameter-list">
+            <li><code>issue_id</code></li>
+            <li><code>issue_subject</code></li>
+            <li><code>project_name</code></li>
+            <li><code>old_status_name</code></li>
+            <li><code>new_status_name</code></li>
+            <li><code>assignee_name</code></li>
+            <li><code>author_name</code></li>
+          </ul>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="clear: both;"></div>
+
+<h3>Ausführungs-Logs (<%= @logs.count %>)</h3>
+
+<% if @logs.any? %>
+  <div class="autoscroll">
+    <table class="list execution-logs">
+      <thead>
+        <tr>
+          <th>Zeitpunkt</th>
+          <th>Issue</th>
+          <th>Status-Wechsel</th>
+          <th>Ergebnis</th>
+          <th>Dauer</th>
+          <th class="buttons"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @logs.each do |log| %>
+          <tr class="<%= cycle('odd', 'even') %> <%= 'error' unless log.success? %>">
+            <td class="timestamp">
+              <%= format_time(log.executed_at) %>
+            </td>
+            <td class="issue">
+              <%= link_to "##{log.issue.id}", issue_path(log.issue) %>
+              <div class="subject">
+                <%= truncate(log.issue.subject, length: 40) %>
+              </div>
+            </td>
+            <td class="transition">
+              <%= log.transition_description %>
+            </td>
+            <td class="result">
+              <span class="result-badge <%= log.success? ? 'success' : 'error' %>">
+                <%= log.success? ? '✓ Erfolgreich' : '✗ Fehlgeschlagen' %>
+              </span>
+              <% if log.error_message.present? %>
+                <div class="error-details">
+                  <%= truncate(log.error_message, length: 100) %>
+                </div>
+              <% end %>
+            </td>
+            <td class="duration">
+              <%= log.duration_in_ms ? "#{log.duration_in_ms}ms" : '-' %>
+            </td>
+            <td class="buttons">
+              <% if log.output.present? || log.error_message.present? %>
+                <a href="#" class="icon icon-zoom-in toggle-details" 
+                   title="Details anzeigen"></a>
+              <% end %>
+            </td>
+          </tr>
+          <% if log.output.present? || log.error_message.present? %>
+            <tr class="log-details" style="display: none;">
+              <td colspan="6">
+                <div class="log-output">
+                  <% if log.output.present? %>
+                    <h4>Ausgabe:</h4>
+                    <pre class="output"><%= log.output %></pre>
+                  <% end %>
+                  <% if log.error_message.present? %>
+                    <h4>Fehler:</h4>
+                    <pre class="error"><%= log.error_message %></pre>
+                  <% end %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="nodata">Noch keine Ausführungen für dieses Script.</p>
+<% end %>
+
+<!-- plugins/redmine_status_scripts/app/views/status_scripts/logs.html.erb -->
+<%= content_for :header_tags do %>
+  <%= stylesheet_link_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+  <%= javascript_include_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+<% end %>
+
+<div class="contextual">
+  <%= link_to 'Zurück zur Übersicht', status_scripts_path, class: 'icon icon-list' %>
+</div>
+
+<h2>Status Script Logs</h2>
+
+<%= form_with url: logs_status_scripts_path, method: :get, local: true, class: 'query-form' do |f| %>
+  <fieldset id="filters" class="collapsible">
+    <legend onclick="toggleFieldset(this);">Filter</legend>
+    <div>
+      <table>
+        <tr>
+          <td class="field">
+            <%= f.label :success, 'Status' %>
+            <%= f.select :success, 
+                         options_for_select([
+                           ['Alle', ''],
+                           ['Erfolgreich', 'true'],
+                           ['Fehlgeschlagen', 'false']
+                         ], params[:success]),
+                         {}, { class: 'small' } %>
+          </td>
+          <td class="field">
+            <%= f.label :issue_id, 'Issue ID' %>
+            <%= f.number_field :issue_id, value: params[:issue_id], class: 'small' %>
+          </td>
+          <td class="field">
+            <%= f.label :config_id, 'Script' %>
+            <%= f.select :config_id,
+                         options_from_collection_for_select(
+                           StatusScriptConfig.order(:name), :id, :name, params[:config_id]
+                         ),
+                         { prompt: 'Alle Scripts' },
+                         { class: 'small' } %>
+          </td>
+          <td class="buttons">
+            <%= f.submit 'Filtern', class: 'button-small' %>
+            <%= link_to 'Zurücksetzen', logs_status_scripts_path, class: 'button-small' %>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </fieldset>
+<% end %>
+
+<% if @logs.any? %>
+  <div class="autoscroll">
+    <table class="list execution-logs">
+      <thead>
+        <tr>
+          <th>Zeitpunkt</th>
+          <th>Issue</th>
+          <th>Projekt</th>
+          <th>Status-Wechsel</th>
+          <th>Script</th>
+          <th>Ergebnis</th>
+          <th>Dauer</th>
+          <th class="buttons"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @logs.each do |log| %>
+          <tr class="<%= cycle('odd', 'even') %> <%= 'error' unless log.success? %>">
+            <td class="timestamp">
+              <%= format_time(log.executed_at) %>
+            </td>
+            <td class="issue">
+              <%= link_to "##{log.issue.id}", issue_path(log.issue) %>
+              <div class="subject">
+                <%= truncate(log.issue.subject, length: 40) %>
+              </div>
+            </td>
+            <td class="project">
+              <%= link_to log.issue.project.name, project_path(log.issue.project) %>
+            </td>
+            <td class="transition">
+              <%= log.transition_description %>
+            </td>
+            <td class="script-name">
+              <% if log.status_script_config %>
+                <%= link_to log.status_script_config.name, 
+                            status_script_path(log.status_script_config) %>
+              <% else %>
+                <em>Script gelöscht</em>
+              <% end %>
+            </td>
+            <td class="result">
+              <span class="result-badge <%= log.success? ? 'success' : 'error' %>">
+                <%= log.success? ? '✓ Erfolgreich' : '✗ Fehlgeschlagen' %>
+              </span>
+            </td>
+            <td class="duration">
+              <%= log.duration_in_ms ? "#{log.duration_in_ms}ms" : '-' %>
+            </td>
+            <td class="buttons">
+              <% if log.output.present? || log.error_message.present? %>
+                <a href="#" class="icon icon-zoom-in toggle-details" 
+                   title="Details anzeigen"></a>
+              <% end %>
+            </td>
+          </tr>
+          <% if log.output.present? || log.error_message.present? %>
+            <tr class="log-details" style="display: none;">
+              <td colspan="8">
+                <div class="log-output">
+                  <% if log.output.present? %>
+                    <h4>Ausgabe:</h4>
+                    <pre class="output"><%= log.output %></pre>
+                  <% end %>
+                  <% if log.error_message.present? %>
+                    <h4>Fehler:</h4>
+                    <pre class="error"><%= log.error_message %></pre>
+                  <% end %>
+                  <% if log.script_params.present? %>
+                    <h4>Parameter:</h4>
+                    <pre class="params"><%= log.script_params %></pre>
+                  <% end %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination-wrapper">
+    <%= paginate @logs if respond_to?(:paginate) %>
+  </div>
+<% else %>
+  <p class="nodata">
+    Keine Logs gefunden.
+    <% if params.any? { |k, v| v.present? && k != 'controller' && k != 'action' } %>
+      <%= link_to 'Filter zurücksetzen', logs_status_scripts_path %>
+    <% end %>
+  </p>
+<% end %>

@@ -1,0 +1,141 @@
+<!-- plugins/redmine_status_scripts/app/views/settings/_status_scripts.html.erb -->
+<%= content_for :header_tags do %>
+  <%= stylesheet_link_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+<% end %>
+
+<div class="box tabular settings">
+  <h3>Status Scripts Plugin Einstellungen</h3>
+  
+  <p>
+    <%= label_tag 'settings_script_path', 'Standard Script-Pfad' %>
+    <%= text_field_tag 'settings[script_path]', 
+                       @settings['script_path'],
+                       size: 60,
+                       placeholder: '/path/to/scripts' %>
+    <em class="info">Verzeichnis für Shell-Scripts (optional)</em>
+  </p>
+
+  <p>
+    <%= label_tag 'settings_enable_logging', 'Logging aktivieren' %>
+    <%= check_box_tag 'settings[enable_logging]', 
+                      '1', 
+                      @settings['enable_logging'] == '1' %>
+    <%= label_tag 'settings_enable_logging', 'Alle Script-Ausführungen protokollieren' %>
+  </p>
+
+  <p>
+    <%= label_tag 'settings_timeout', 'Standard Timeout (Sekunden)' %>
+    <%= number_field_tag 'settings[timeout]', 
+                         @settings['timeout'] || 30,
+                         min: 1, max: 300 %>
+    <em class="info">Maximale Ausführungszeit für Scripts</em>
+  </p>
+
+  <p>
+    <%= label_tag 'settings_max_log_entries', 'Maximale Log-Einträge' %>
+    <%= number_field_tag 'settings[max_log_entries]', 
+                         @settings['max_log_entries'] || 1000,
+                         min: 100, max: 10000 %>
+    <em class="info">Anzahl Log-Einträge bevor alte automatisch gelöscht werden</em>
+  </p>
+
+  <p>
+    <%= label_tag 'settings_async_execution', 'Asynchrone Ausführung' %>
+    <%= check_box_tag 'settings[async_execution]', 
+                      '1', 
+                      @settings['async_execution'] == '1' %>
+    <%= label_tag 'settings_async_execution', 'Scripts im Hintergrund ausführen (empfohlen für lange Scripts)' %>
+  </p>
+
+  <p>
+    <%= label_tag 'settings_allowed_domains', 'Erlaubte Webhook-Domains' %>
+    <%= text_area_tag 'settings[allowed_domains]', 
+                      @settings['allowed_domains'],
+                      rows: 4, cols: 60,
+                      placeholder: "example.com\nyour-app.com\napi.slack.com" %>
+    <em class="info">Eine Domain pro Zeile. Leer lassen um alle zu erlauben.</em>
+  </p>
+
+  <fieldset class="box">
+    <legend>Sicherheitseinstellungen</legend>
+    
+    <p>
+      <%= label_tag 'settings_sandbox_mode', 'Sandbox-Modus' %>
+      <%= check_box_tag 'settings[sandbox_mode]', 
+                        '1', 
+                        @settings['sandbox_mode'] == '1' %>
+      <%= label_tag 'settings_sandbox_mode', 'Ruby-Scripts in eingeschränkter Umgebung ausführen' %>
+    </p>
+
+    <p>
+      <%= label_tag 'settings_require_admin_approval', 'Admin-Freigabe erforderlich' %>
+      <%= check_box_tag 'settings[require_admin_approval]', 
+                        '1', 
+                        @settings['require_admin_approval'] == '1' %>
+      <%= label_tag 'settings_require_admin_approval', 'Neue Scripts müssen von Administrator freigegeben werden' %>
+    </p>
+  </fieldset>
+
+  <fieldset class="box">
+    <legend>E-Mail Benachrichtigungen</legend>
+    
+    <p>
+      <%= label_tag 'settings_notify_on_failure', 'Bei Fehlern benachrichtigen' %>
+      <%= check_box_tag 'settings[notify_on_failure]', 
+                        '1', 
+                        @settings['notify_on_failure'] == '1' %>
+      <%= label_tag 'settings_notify_on_failure', 'Administrator per E-Mail über fehlgeschlagene Scripts informieren' %>
+    </p>
+
+    <p>
+      <%= label_tag 'settings_notification_email', 'Benachrichtigungs-E-Mail' %>
+      <%= email_field_tag 'settings[notification_email]', 
+                          @settings['notification_email'],
+                          size: 40,
+                          placeholder: 'admin@example.com' %>
+      <em class="info">E-Mail-Adresse für Fehlerbenachrichtigungen</em>
+    </p>
+  </fieldset>
+</div>
+
+<div class="box">
+  <h3>Plugin-Informationen</h3>
+  
+  <table class="attributes">
+    <tr>
+      <th>Version:</th>
+      <td>1.0.0</td>
+    </tr>
+    <tr>
+      <th>Aktive Scripts:</th>
+      <td><%= StatusScriptConfig.enabled.count %></td>
+    </tr>
+    <tr>
+      <th>Gesamt-Ausführungen:</th>
+      <td><%= StatusScriptLog.count %></td>
+    </tr>
+    <tr>
+      <th>Erfolgsquote:</th>
+      <td>
+        <% 
+          total = StatusScriptLog.count
+          successful = StatusScriptLog.successful.count
+          rate = total > 0 ? (successful.to_f / total * 100).round(1) : 0
+        %>
+        <%= rate %>% (<%= successful %>/<%= total %>)
+      </td>
+    </tr>
+    <tr>
+      <th>Letzte Ausführung:</th>
+      <td>
+        <% last_log = StatusScriptLog.recent.first %>
+        <%= last_log ? time_ago_in_words(last_log.executed_at) + ' ago' : 'Keine' %>
+      </td>
+    </tr>
+  </table>
+  
+  <div class="contextual" style="margin-top: 10px;">
+    <%= link_to 'Status Scripts verwalten', status_scripts_path, class: 'button' %>
+    <%= link_to 'Alle Logs anzeigen', logs_status_scripts_path, class: 'button' %>
+  </div>
+</div>

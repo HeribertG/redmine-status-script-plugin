@@ -1,0 +1,387 @@
+/* plugins/redmine_status_scripts/assets/stylesheets/status_scripts_admin.css */
+
+/* Erweiterte Styles für Admin-Bereich */
+
+/* Settings Page */
+.settings .box {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.settings .box h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #495057;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 8px;
+}
+
+.settings fieldset {
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.settings fieldset legend {
+  font-weight: bold;
+  color: #495057;
+  padding: 0 10px;
+}
+
+/* Mini Chart */
+.mini-chart {
+  display: flex;
+  align-items: flex-end;
+  height: 40px;
+  width: 200px;
+  border-bottom: 1px solid #dee2e6;
+  padding: 2px;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(to top, #28a745 0%, #28a745 var(--success-rate, 100%), #dc3545 var(--success-rate, 100%), #dc3545 100%);
+  margin: 0 1px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+}
+
+/* Duration Badges */
+.duration-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75em;
+  font-weight: bold;
+}
+
+.duration-badge.fast {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.duration-badge.medium {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.duration-badge.slow {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Execution Trends */
+.execution-trend {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.trend-excellent {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.trend-good {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.trend-warning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.trend-critical {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Issue Links */
+.issue-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.issue-link:hover {
+  text-decoration: underline;
+}
+
+.issue-link .issue-id {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.issue-link .project-name {
+  font-size: 0.8em;
+  color: #666;
+  display: block;
+}
+
+/* Truncated Text */
+.truncated-text {
+  cursor: help;
+  border-bottom: 1px dotted #999;
+}
+
+/* Log Sections */
+.log-section {
+  margin-bottom: 15px;
+}
+
+.log-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.9em;
+  color: #495057;
+  font-weight: bold;
+}
+
+.log-section pre {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 0;
+  font-size: 0.85em;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* Webhook Test Form */
+.webhook-test-form {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.webhook-test-form .form-group {
+  margin-bottom: 15px;
+}
+
+.webhook-test-form .form-actions {
+  margin-top: 10px;
+}
+
+.webhook-test-form .separator {
+  color: #666;
+  margin: 0 8px;
+}
+
+.use-sample-data {
+  color: #007bff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.use-sample-data:hover {
+  text-decoration: underline;
+}
+
+/* Field Errors */
+.field-error {
+  border-left: 3px solid #dc3545;
+  padding-left: 10px;
+}
+
+.field-error-message {
+  color: #dc3545;
+  font-size: 0.8em;
+  display: block;
+  margin-top: 5px;
+}
+
+.field-error input,
+.field-error textarea,
+.field-error select {
+  border-color: #dc3545;
+}
+
+/* Syntax Highlighting */
+.language-bash {
+  background-color: #2d3748;
+  color: #e2e8f0;
+}
+
+.language-ruby {
+  background-color: #1a202c;
+  color: #e2e8f0;
+}
+
+.script-content.language-bash .comment {
+  color: #68d391;
+}
+
+.script-content.language-ruby .comment {
+  color: #68d391;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .script-details {
+    flex-direction: column;
+  }
+  
+  .splitcontentleft,
+  .splitcontentright {
+    flex: none;
+  }
+  
+  .mini-chart {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .execution-logs td.project,
+  .execution-logs td.duration,
+  .status-scripts .description {
+    display: none;
+  }
+  
+  .webhook-test-form {
+    padding: 10px;
+  }
+  
+  .settings .box {
+    padding: 15px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .contextual,
+  .buttons,
+  .webhook-test-form,
+  .toggle-details {
+    display: none !important;
+  }
+  
+  .script-content,
+  .log-output pre {
+    background-color: white !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .status-badge,
+  .result-badge,
+  .script-type-badge {
+    border: 1px solid #000 !important;
+    background-color: white !important;
+    color: black !important;
+  }
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus Styles */
+button:focus,
+.button:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* Loading States */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #007bff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Tooltips */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
+[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #333;
+  z-index: 1000;
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

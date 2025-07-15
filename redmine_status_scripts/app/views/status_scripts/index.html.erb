@@ -1,0 +1,80 @@
+<!-- plugins/redmine_status_scripts/app/views/status_scripts/index.html.erb -->
+<div class="contextual">
+  <%= link_to 'Neues Status Script', new_status_script_path, class: 'icon icon-add' %>
+</div>
+
+<h2>Status Scripts</h2>
+
+<% if @status_script_configs.any? %>
+  <table class="list">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Status-Übergang</th>
+        <th>Projekt</th>
+        <th>Typ</th>
+        <th>Status</th>
+        <th class="buttons"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @status_script_configs.each do |config| %>
+        <tr class="<%= cycle('odd', 'even') %>">
+          <td><%= link_to config.name, status_script_path(config) %></td>
+          <td>
+            <%= config.from_status&.name || 'Jeder Status' %> → 
+            <%= config.to_status.name %>
+          </td>
+          <td><%= config.project&.name || 'Alle Projekte' %></td>
+          <td><%= config.script_type.humanize %></td>
+          <td><%= config.enabled? ? 'Aktiv' : 'Inaktiv' %></td>
+          <td class="buttons">
+            <%= link_to 'Bearbeiten', edit_status_script_path(config), class: 'icon icon-edit' %>
+            <%= link_to 'Löschen', status_script_path(config), method: :delete, 
+                        confirm: 'Sicher löschen?', class: 'icon icon-del' %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="nodata">
+    Keine Status Scripts konfiguriert. 
+    <%= link_to 'Erstes Script erstellen', new_status_script_path %>
+  </p>
+<% end %>
+
+<h3>Letzte Ausführungen</h3>
+
+<% if @status_script_logs.any? %>
+  <table class="list">
+    <thead>
+      <tr>
+        <th>Zeitpunkt</th>
+        <th>Issue</th>
+        <th>Status-Wechsel</th>
+        <th>Ergebnis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @status_script_logs.each do |log| %>
+        <tr class="<%= cycle('odd', 'even') %>">
+          <td><%= format_time(log.executed_at) %></td>
+          <td>
+            <%= link_to "##{log.issue.id}", issue_path(log.issue) %>
+            <br><%= truncate(log.issue.subject, length: 50) %>
+          </td>
+          <td>
+            <%= log.from_status&.name || 'Unbekannt' %> → 
+            <%= log.to_status.name %>
+          </td>
+          <td>
+            <%= log.success? ? '✓ Erfolgreich' : '✗ Fehlgeschlagen' %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="nodata">Noch keine Scripts ausgeführt.</p>
+<% end %>

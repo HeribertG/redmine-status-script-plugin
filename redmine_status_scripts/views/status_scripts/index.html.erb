@@ -1,0 +1,164 @@
+<%= content_for :header_tags do %>
+  <%= stylesheet_link_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+  <%= javascript_include_tag 'status_scripts', plugin: 'redmine_status_scripts' %>
+<% end %>
+
+<div class="contextual">
+  <%= link_to 'Neues Status Script', new_status_script_path, 
+              class: 'icon icon-add' %>
+  <%= link_to 'Alle Logs anzeigen', logs_status_scripts_path, 
+              class: 'icon icon-list' %>
+</div>
+
+<h2>Status Scripts</h2>
+
+<% if @status_script_configs.any? %>
+  <div class="autoscroll">
+    <table class="list status-scripts">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Status-Übergang</th>
+          <th>Projekt</th>
+          <th>Typ</th>
+          <th>Status</th>
+          <th>Letzte Ausführung</th>
+          <th class="buttons"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @status_script_configs.each do |config| %>
+          <tr class="<%= cycle('odd', 'even') %> <%= 'disabled' unless config.enabled? %>">
+            <td class="name">
+              <%= link_to config.name, status_script_path(config) %>
+              <% if config.description.present? %>
+                <div class="description">
+                  <%= truncate(config.description, length: 100) %>
+                </div>
+              <% end %>
+            </td>
+            <td class="transition">
+              <span class="from-status">
+                <%= config.from_status&.name || 'Jeder Status' %>
+              </span>
+              <span class="arrow">→</span>
+              <span class="to-status">
+                <%= config.to_status.name %>
+              </span>
+            </td>
+            <td class="project">
+              <%= config.project&.name || 'Alle Projekte' %>
+            </td>
+            <td class="script-type">
+              <span class="script-type-badge script-type-<%= config.script_type %>">
+                <%= config.script_type.humanize %>
+              </span>
+            </td>
+            <td class="status">
+              <%= content_tag :span, 
+                    config.enabled? ? 'Aktiv' : 'Inaktiv',
+                    class: "status-badge #{config.enabled? ? 'enabled' : 'disabled'}" %>
+            </td>
+            <td class="last-execution">
+              <% last_log = config.status_script_logs.recent.first %>
+              <% if last_log %>
+                <div class="execution-info">
+                  <span class="time"><%= time_ago_in_words(last_log.executed_at) %> ago</span>
+                  <span class="result <%= last_log.success? ? 'success' : 'error' %>">
+                    <%= last_log.success? ? '✓' : '✗' %>
+                  </span>
+                </div>
+              <% else %>
+                <span class="no-execution">Noch nicht ausgeführt</span>
+              <% end %>
+            </td>
+            <td class="buttons">
+              <%= link_to '', status_script_path(config), 
+                          class: 'icon icon-zoom-in', 
+                          title: 'Details anzeigen' %>
+              <%= link_to '', edit_status_script_path(config), 
+                          class: 'icon icon-edit', 
+                          title: 'Bearbeiten' %>
+              <%= link_to '', toggle_status_script_path(config), 
+                          method: :patch,
+                          class: "icon #{config.enabled? ? 'icon-lock' : 'icon-unlock'}", 
+                          title: config.enabled? ? 'Deaktivieren' : 'Aktivieren',
+                          confirm: "Script #{config.enabled? ? 'deaktivieren' : 'aktivieren'}?" %>
+              <%= link_to '', test_status_script_path(config), 
+                          method: :post,
+                          class: 'icon icon-test', 
+                          title: 'Testen',
+                          confirm: 'Script mit Test-Daten ausführen?' %>
+              <%= link_to '', status_script_path(config), 
+                          method: :delete,
+                          class: 'icon icon-del', 
+                          title: 'Löschen',
+                          confirm: 'Script wirklich löschen?' %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="nodata">
+    Keine Status Scripts konfiguriert. 
+    <%= link_to 'Erstes Script erstellen', new_status_script_path %>
+  </p>
+<% end %>
+
+<h3>Letzte Ausführungen</h3>
+
+<% if @status_script_logs.any? %>
+  <div class="autoscroll">
+    <table class="list recent-logs">
+      <thead>
+        <tr>
+          <th>Zeitpunkt</th>
+          <th>Issue</th>
+          <th>Status-Wechsel</th>
+          <th>Script</th>
+          <th>Ergebnis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @status_script_logs.each do |log| %>
+          <tr class="<%= cycle('odd', 'even') %>">
+            <td class="timestamp">
+              <%= format_time(log.executed_at) %>
+            </td>
+            <td class="issue">
+              <%= link_to "##{log.issue.id}", issue_path(log.issue) %>
+              <div class="subject">
+                <%= truncate(log.issue.subject, length: 50) %>
+              </div>
+            </td>
+            <td class="transition">
+              <%= log.transition_description %>
+            </td>
+            <td class="script-name">
+              <% if log.status_script_config %>
+                <%= link_to log.status_script_config.name, 
+                            status_script_path(log.status_script_config) %>
+              <% else %>
+                <em>Script gelöscht</em>
+              <% end %>
+            </td>
+            <td class="result">
+              <span class="result-badge <%= log.success? ? 'success' : 'error' %>">
+                <%= log.execution_summary %>
+              </span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="pagination-wrapper">
+    <%= link_to 'Alle Logs anzeigen', logs_status_scripts_path, 
+                class: 'button' %>
+  </div>
+<% else %>
+  <p class="nodata">Noch keine Scripts ausgeführt.</p>
+<% end %>
