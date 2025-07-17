@@ -2,16 +2,11 @@ Redmine::Plugin.register :redmine_status_scripts do
   name 'Redmine Status Scripts Plugin'
   author 'projektfokus'
   description 'Führt Skripte bei Status-Wechseln aus'
-  version '1.0.1'  
+  version '1.0.1'
   url 'https://projektfokus.ch'
   author_url 'https://projektfokus.ch'
 
-  settings default: {
-    'script_path' => '/path/to/scripts',
-    'enable_logging' => true,
-    'timeout' => 30
-  }, partial: 'settings/status_scripts'
-
+  
   menu :admin_menu, :status_scripts, 
        { controller: 'status_scripts', action: 'index' }, 
        caption: 'Status Scripts',
@@ -117,20 +112,18 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     Rails.logger.info "Status Script: Executing shell script (normalized)"
     
-    # *** KRITISCHE ÄNDERUNG: Zeilenendezeichen normalisieren ***
-    # Alle \r\n zu \n konvertieren, dann alle verbleibenden \r zu \n
+    # Zeilenendezeichen normalisieren
     normalized_content = script_content.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
     
-    # Zusätzliche Bereinigung: Überflüssige Leerzeichen und Tabs am Zeilenende entfernen
-    # aber Einrückungen am Zeilenanfang beibehalten
+    # Überflüssige Leerzeichen am Zeilenende entfernen
     normalized_content = normalized_content.split("\n").map do |line|
-      line.rstrip  # Nur rechts trimmen, links (Einrückung) beibehalten
+      line.rstrip
     end.join("\n")
     
     # Sicherstellen, dass das Script mit einem Newline endet
     normalized_content += "\n" unless normalized_content.end_with?("\n")
     
-    # Umgebungsvariablen setzen - auch hier normalisieren
+    # Umgebungsvariablen setzen
     env = params.transform_keys { |k| "REDMINE_#{k.to_s.upcase}" }
                 .transform_values { |v| normalize_env_value(v.to_s) }
     
@@ -138,16 +131,12 @@ class StatusScriptHooks < Redmine::Hook::Listener
     script_file = Tempfile.new(['status_script', '.sh'], '/tmp')
     
     begin
-      # Normalisierten Inhalt schreiben
       script_file.write(normalized_content)
       script_file.close
-      
-      # Ausführbar machen
       File.chmod(0755, script_file.path)
       
       Rails.logger.info "Status Script: Script file created at #{script_file.path}"
       
-      # Output-Dateien definieren
       output_file = script_file.path + '.out'
       error_file = script_file.path + '.err'
       
@@ -155,7 +144,6 @@ class StatusScriptHooks < Redmine::Hook::Listener
       
       pid = Process.spawn(env, script_file.path, out: output_file, err: error_file)
       
-      # Timeout-Handling
       begin
         Timeout.timeout(timeout) do
           Process.wait(pid)
@@ -165,7 +153,6 @@ class StatusScriptHooks < Redmine::Hook::Listener
         raise "Script timeout after #{timeout} seconds"
       end
       
-      # Output lesen und normalisieren
       output = ""
       if File.exist?(output_file)
         output = File.read(output_file)
@@ -188,7 +175,6 @@ class StatusScriptHooks < Redmine::Hook::Listener
       Rails.logger.error "Status Script: Shell script failed: #{e.message}"
       raise e
     ensure
-      # Cleanup
       script_file&.unlink
       [output_file, error_file].each { |f| File.delete(f) if f && File.exist?(f) }
     end
@@ -197,15 +183,11 @@ class StatusScriptHooks < Redmine::Hook::Listener
   private
 
   def normalize_env_value(value)
-    # Umgebungsvariablen dürfen keine Zeilenwechsel enthalten
     value.to_s.gsub(/\r\n/, ' ').gsub(/[\r\n]/, ' ').strip
   end
 
   def normalize_output(output)
-    # Output normalisieren, aber lesbar halten
     return "" if output.blank?
-    
-    # Nur problematische Zeichen entfernen, normale Zeilenwechsel beibehalten
     output.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
   end
 end
