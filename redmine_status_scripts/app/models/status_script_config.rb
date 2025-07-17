@@ -1,4 +1,3 @@
-# plugins/redmine_status_scripts/app/models/status_script_config.rb
 class StatusScriptConfig < ActiveRecord::Base
   belongs_to :from_status, class_name: 'IssueStatus', optional: true
   belongs_to :to_status, class_name: 'IssueStatus'
@@ -37,7 +36,7 @@ class StatusScriptConfig < ActiveRecord::Base
     if project_id
       project_config = configs.where(project_id: project_id)
                              .where('from_status_id IS NULL OR from_status_id = ?', from_status_id)
-                             .order(Arel.sql('from_status_id DESC NULLS LAST'))
+                             .order('from_status_id DESC, id DESC')  # MySQL 5.7 kompatibel
                              .first
       
       if project_config
@@ -49,7 +48,7 @@ class StatusScriptConfig < ActiveRecord::Base
     # Dann globale Konfiguration
     global_config = configs.where(project_id: nil)
                           .where('from_status_id IS NULL OR from_status_id = ?', from_status_id)
-                          .order(Arel.sql('from_status_id DESC NULLS LAST'))
+                          .order('from_status_id DESC, id DESC')  # MySQL 5.7 kompatibel
                           .first
     
     if global_config
@@ -59,40 +58,5 @@ class StatusScriptConfig < ActiveRecord::Base
     end
     
     global_config
-  end
-end
-
-# plugins/redmine_status_scripts/app/models/status_script_log.rb
-class StatusScriptLog < ActiveRecord::Base
-  belongs_to :issue
-  belongs_to :from_status, class_name: 'IssueStatus', optional: true
-  belongs_to :to_status, class_name: 'IssueStatus'
-  belongs_to :status_script_config, optional: true
-
-  validates :issue_id, presence: true
-  validates :to_status_id, presence: true
-  validates :executed_at, presence: true
-
-  scope :recent, -> { order(executed_at: :desc) }
-  scope :successful, -> { where(success: true) }
-  scope :failed, -> { where(success: false) }
-
-  def transition_description
-    from_name = from_status&.name || 'Unbekannt'
-    to_name = to_status.name
-    "#{from_name} → #{to_name}"
-  end
-
-  def execution_summary
-    if success?
-      "Erfolgreich"
-    else
-      "Fehlgeschlagen" + (error_message.present? ? ": #{error_message}" : "")
-    end
-  end
-
-  def duration_in_ms
-    return nil unless started_at && finished_at
-    ((finished_at - started_at) * 1000).round(2)
   end
 end
