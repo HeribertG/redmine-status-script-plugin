@@ -110,21 +110,40 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     Rails.logger.info "Status Script: Executing shell script"
     
-    # Umgebungsvariablen setzen
+    # *** KRITISCHE ÄNDERUNG: Zeilenendezeichen normalisieren ***
+    # Alle \r\n zu \n konvertieren, dann alle verbleibenden \r zu \n
+    normalized_content = script_content.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
+    
+    # Zusätzliche Bereinigung: Überflüssige Leerzeichen und Tabs am Zeilenende entfernen
+    # aber Einrückungen am Zeilenanfang beibehalten
+    normalized_content = normalized_content.split("\n").map do |line|
+      line.rstrip  # Nur rechts trimmen, links (Einrückung) beibehalten
+    end.join("\n")
+    
+    # Sicherstellen, dass das Script mit einem Newline endet
+    normalized_content += "\n" unless normalized_content.end_with?("\n")
+    
+    Rails.logger.debug "Status Script: Normalized script content length: #{normalized_content.length}"
+    
+    # Umgebungsvariablen setzen - auch hier normalisieren
     env = params.transform_keys { |k| "REDMINE_#{k.to_s.upcase}" }
-                .transform_values { |v| v.to_s }
+                .transform_values { |v| normalize_env_value(v.to_s) }
     
     # Temporäres Script-File erstellen
     script_file = Tempfile.new(['status_script', '.sh'], '/tmp')
-    script_file.write(script_content)
-    script_file.close
     
-    # Ausführbar machen
-    File.chmod(0755, script_file.path)
-    
-    # Script ausführen
-    output = ""
     begin
+      # Normalisierten Inhalt schreiben
+      script_file.write(normalized_content)
+      script_file.close
+      
+      # Ausführbar machen
+      File.chmod(0755, script_file.path)
+      
+      Rails.logger.info "Status Script: Script file created at #{script_file.path}"
+      
+      # Script ausführen
+      output = ""
       output_file = script_file.path + '.out'
       error_file = script_file.path + '.err'
       
@@ -147,10 +166,17 @@ class StatusScriptHooks < Redmine::Hook::Listener
       if File.exist?(error_file)
         error_content = File.read(error_file)
         File.delete(error_file)
-        output += "\nSTDERR:\n#{error_content}" if error_content.present?
+        if error_content.present?
+          # Auch Error-Output normalisieren
+          error_content = normalize_output(error_content)
+          output += "\nSTDERR:\n#{error_content}"
+        end
       end
       
       Rails.logger.info "Status Script: Shell script completed successfully"
+      
+      # Output normalisieren bevor es zurückgegeben wird
+      normalize_output(output.presence || "Script executed successfully")
       
     rescue Timeout::Error
       Process.kill('TERM', pid) rescue nil
@@ -158,12 +184,11 @@ class StatusScriptHooks < Redmine::Hook::Listener
     rescue => e
       Rails.logger.error "Status Script: Shell script failed: #{e.message}"
       raise e
+    ensure
+      # Cleanup
+      script_file&.unlink
+      [output_file, error_file].each { |f| File.delete(f) if f && File.exist?(f) }
     end
-    
-    output.presence || "Script executed successfully"
-    
-  ensure
-    script_file&.unlink
   end
 
   def execute_webhook(url, params, timeout = 30)
@@ -174,7 +199,10 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     Rails.logger.info "Status Script: Sending webhook to #{url}"
     
-    uri = URI(url)
+    # URL normalisieren
+    normalized_url = url.strip.gsub(/\r|\n/, '')
+    
+    uri = URI(normalized_url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = (uri.scheme == 'https')
     http.read_timeout = timeout
@@ -182,7 +210,10 @@ class StatusScriptHooks < Redmine::Hook::Listener
     request = Net::HTTP::Post.new(uri)
     request['Content-Type'] = 'application/json'
     request['User-Agent'] = 'Redmine Status Scripts Plugin'
-    request.body = params.to_json
+    
+    # Webhook-Parameter auch normalisieren
+    normalized_params = normalize_webhook_params(params)
+    request.body = normalized_params.to_json
     
     response = http.request(request)
     
@@ -199,12 +230,16 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     Rails.logger.info "Status Script: Executing Ruby code"
     
+    # Ruby-Code normalisieren
+    normalized_code = normalize_ruby_code(code)
+    
     # Sicheren Kontext erstellen
     binding_context = Object.new
     
-    # Parameter als Instanzvariablen setzen
+    # Parameter als Instanzvariablen setzen - normalisiert
     params.each do |key, value|
-      binding_context.instance_variable_set("@#{key}", value)
+      normalized_value = value.is_a?(String) ? normalize_env_value(value) : value
+      binding_context.instance_variable_set("@#{key}", normalized_value)
     end
     
     # Output capturing
@@ -213,18 +248,55 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     begin
       # Code ausführen
-      result = binding_context.instance_eval(code)
+      result = binding_context.instance_eval(normalized_code)
       output = $stdout.string
       output += "\nReturn value: #{result.inspect}" if result
       
       Rails.logger.info "Status Script: Ruby code executed successfully"
-      return output.presence || "Ruby code executed successfully"
+      normalize_output(output.presence || "Ruby code executed successfully")
       
     rescue => e
       Rails.logger.error "Status Script: Ruby code failed: #{e.message}"
       raise e
     ensure
       $stdout = original_stdout
+    end
+  end
+
+  private
+
+  # Hilfsmethoden für die Normalisierung
+
+  def normalize_env_value(value)
+    # Umgebungsvariablen dürfen keine Zeilenwechsel enthalten
+    value.to_s.gsub(/\r\n/, ' ').gsub(/[\r\n]/, ' ').strip
+  end
+
+  def normalize_output(output)
+    # Output normalisieren, aber lesbar halten
+    return "" if output.blank?
+    
+    # Nur problematische Zeichen entfernen, normale Zeilenwechsel beibehalten
+    output.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
+  end
+
+  def normalize_ruby_code(code)
+    # Ruby-Code normalisieren aber Struktur beibehalten
+    code.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
+  end
+
+  def normalize_webhook_params(params)
+    # Webhook-Parameter rekursiv normalisieren
+    case params
+    when Hash
+      params.transform_values { |v| normalize_webhook_params(v) }
+    when Array
+      params.map { |v| normalize_webhook_params(v) }
+    when String
+      # Strings für JSON normalisieren
+      params.gsub(/\r\n/, "\\n").gsub(/\r/, "\\n").gsub(/\t/, "\\t")
+    else
+      params
     end
   end
 end

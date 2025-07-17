@@ -2,7 +2,7 @@ Redmine::Plugin.register :redmine_status_scripts do
   name 'Redmine Status Scripts Plugin'
   author 'projektfokus'
   description 'Führt Skripte bei Status-Wechseln aus'
-  version '1.0.0'
+  version '1.0.1'  
   url 'https://projektfokus.ch'
   author_url 'https://projektfokus.ch'
 
@@ -106,33 +106,108 @@ class StatusScriptHooks < Redmine::Hook::Listener
     
     case config.script_type
     when 'shell'
-      env = script_params.transform_keys { |k| "REDMINE_#{k.to_s.upcase}" }
-                        .transform_values { |v| v.to_s }
-      
-      script_file = Tempfile.new(['status_script', '.sh'], '/tmp')
-      script_file.write(config.script_content)
-      script_file.close
-      File.chmod(0755, script_file.path)
-      
-      output_file = script_file.path + '.out'
-      error_file = script_file.path + '.err'
-      
-      pid = Process.spawn(env, script_file.path, out: output_file, err: error_file)
-      Process.wait(pid)
-      
-      output = ""
-      output = File.read(output_file) if File.exist?(output_file)
-      error_content = File.read(error_file) if File.exist?(error_file)
-      output += "\nSTDERR:\n#{error_content}" if error_content.present?
-      
-      [output_file, error_file].each { |f| File.delete(f) if File.exist?(f) }
-      script_file.unlink
-      
-      output.presence || "Script executed successfully"
+      execute_shell_script_normalized(config.script_content, script_params, config.timeout)
     else
       "Script type #{config.script_type} not implemented yet"
     end
   end
+
+  def execute_shell_script_normalized(script_content, params, timeout = 30)
+    return "No script content" unless script_content.present?
+    
+    Rails.logger.info "Status Script: Executing shell script (normalized)"
+    
+    # *** KRITISCHE ÄNDERUNG: Zeilenendezeichen normalisieren ***
+    # Alle \r\n zu \n konvertieren, dann alle verbleibenden \r zu \n
+    normalized_content = script_content.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
+    
+    # Zusätzliche Bereinigung: Überflüssige Leerzeichen und Tabs am Zeilenende entfernen
+    # aber Einrückungen am Zeilenanfang beibehalten
+    normalized_content = normalized_content.split("\n").map do |line|
+      line.rstrip  # Nur rechts trimmen, links (Einrückung) beibehalten
+    end.join("\n")
+    
+    # Sicherstellen, dass das Script mit einem Newline endet
+    normalized_content += "\n" unless normalized_content.end_with?("\n")
+    
+    # Umgebungsvariablen setzen - auch hier normalisieren
+    env = params.transform_keys { |k| "REDMINE_#{k.to_s.upcase}" }
+                .transform_values { |v| normalize_env_value(v.to_s) }
+    
+    # Temporäres Script-File erstellen
+    script_file = Tempfile.new(['status_script', '.sh'], '/tmp')
+    
+    begin
+      # Normalisierten Inhalt schreiben
+      script_file.write(normalized_content)
+      script_file.close
+      
+      # Ausführbar machen
+      File.chmod(0755, script_file.path)
+      
+      Rails.logger.info "Status Script: Script file created at #{script_file.path}"
+      
+      # Output-Dateien definieren
+      output_file = script_file.path + '.out'
+      error_file = script_file.path + '.err'
+      
+      Rails.logger.info "Status Script: Running script #{script_file.path}"
+      
+      pid = Process.spawn(env, script_file.path, out: output_file, err: error_file)
+      
+      # Timeout-Handling
+      begin
+        Timeout.timeout(timeout) do
+          Process.wait(pid)
+        end
+      rescue Timeout::Error
+        Process.kill('TERM', pid) rescue nil
+        raise "Script timeout after #{timeout} seconds"
+      end
+      
+      # Output lesen und normalisieren
+      output = ""
+      if File.exist?(output_file)
+        output = File.read(output_file)
+        output = normalize_output(output)
+      end
+      
+      if File.exist?(error_file)
+        error_content = File.read(error_file)
+        if error_content.present?
+          error_content = normalize_output(error_content)
+          output += "\nSTDERR:\n#{error_content}"
+        end
+      end
+      
+      Rails.logger.info "Status Script: Shell script completed successfully"
+      
+      output.presence || "Script executed successfully"
+      
+    rescue => e
+      Rails.logger.error "Status Script: Shell script failed: #{e.message}"
+      raise e
+    ensure
+      # Cleanup
+      script_file&.unlink
+      [output_file, error_file].each { |f| File.delete(f) if f && File.exist?(f) }
+    end
+  end
+
+  private
+
+  def normalize_env_value(value)
+    # Umgebungsvariablen dürfen keine Zeilenwechsel enthalten
+    value.to_s.gsub(/\r\n/, ' ').gsub(/[\r\n]/, ' ').strip
+  end
+
+  def normalize_output(output)
+    # Output normalisieren, aber lesbar halten
+    return "" if output.blank?
+    
+    # Nur problematische Zeichen entfernen, normale Zeilenwechsel beibehalten
+    output.gsub(/\r\n/, "\n").gsub(/\r/, "\n")
+  end
 end
 
-Rails.logger.info "Status Script Plugin: Loaded successfully with hook"
+Rails.logger.info "Status Script Plugin: Loaded successfully with normalized hook (v1.0.1)"
